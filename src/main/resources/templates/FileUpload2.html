@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <title>FileUpload</title>
+    <script src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+</head>
+<body>
+	<div class="container">
+	    <div class="panel panel-default">
+       	    <div class="panel-heading">分段读取文件：</div>
+           	<div class="panel-body" id="bodyOne">
+                <input type="file" id="file"  multiple/><br />
+            </div>
+        </div>
+    </div>
+</body>
+<script>
+	(function () {
+/*
+* 测试WebSocket多文件上传
+* 上传速度取决于 每次send() 的数据大小 ，Google之所以相对比较慢，是因为每次send的数据量太小
+*/
+	var fileBox = document.getElementById('file');
+	var file;
+	var upstate;
+	var timer = new Timer();
+	fileBox.onchange = function () {
+    	    var files = this.files;
+    	    for (var i = 0; i < files.length; i++) {
+        	    file = files[i];
+        	    console.log(1);
+        	    var operate = new uploadFileInfo(file);
+        	    upstate=0;
+        	    while(upstate==0){
+        	    	timer.sleep(100);
+        	    }
+    	    }
+	}
+    var url = 'ws://127.0.0.1:8080/websocket/fileup';
+    //指定上传文件，创建上传操作对象
+    function uploadFileInfo(f) {
+        var fileInfo = {};
+	    fileInfo.fileName = f.name;
+        fileInfo.fileSize = f.size;
+        fileInfo.fileInfo = f.type;
+        fileInfo.fileId = Date.parse(new Date()) + RndNum(6);//写死一个hash值
+	    initWebSocket();
+	    console.log(2);
+        if(ws.readyState == 1) {
+       		ws.send(JSON.stringify(fileInfo));
+       		console.log(3);
+	    }
+    }
+    function uploadFile(obj) {
+        var blob = file.slice(obj.indexStart, obj.indexEnd);
+        var reader = new FileReader();
+        reader.onload = function (e) {
+		    console.log(e.target.result);
+            ws.send(e.target.result);
+        };
+        reader.readAsArrayBuffer(blob);
+    }
+    
+    var onopen = function (that) {
+        console.log('Websocket is opened.');
+    }
+    
+    var onmessage = function (that) {
+        return function (e) {
+		    console.log(e,"4");
+            var obj = JSON.parse(e.data);
+            if (obj.typeId == 'uploadCommand') {
+                console.log('文件完成：' + parseInt(obj.completePercent * 65 + 35, 10) + '%');
+                if (obj.completePercent != 1) {
+                    uploadFile(obj);
+                } else {
+                    console.log('文件上传完成，开始上传下一个文件。', "5");
+                    upstate=1;
+                }
+            }
+        }
+    }
+    var onclose = function (that) {
+        console.log('Websocket is close.');
+    }
+    
+	var ws = new WebSocket(url); //初始化上传对象
+    var initWebSocket = function () {
+	    ws.open = onopen(this);
+	    ws.onmessage = onmessage(this);
+    }
+    function RndNum(n){
+        var rnd="";
+        for(var i=0;i<n;i++)
+            rnd+=Math.floor(Math.random()*10);
+        return rnd;
+    }
+    function Timer() { this.delay = 0; }
+    Timer.prototype.sleep = function(delay) { this.delay += delay; return this; };
+})();
+</script>
+</html>
